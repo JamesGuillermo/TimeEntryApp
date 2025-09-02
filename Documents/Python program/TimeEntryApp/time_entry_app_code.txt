@@ -1,0 +1,518 @@
+"""
+Time Entry Application - Complete Python Code
+==============================================
+
+A GUI application for entering digit-based time values, converting them to HH:MM format,
+and saving to Excel files with a predefined structure.
+
+Requirements:
+- ttkbootstrap (pip install ttkbootstrap)
+- pandas (pip install pandas)
+- openpyxl (pip install openpyxl)
+
+Author: GitHub Copilot
+Date: September 2, 2025
+"""
+
+import tkinter as tk
+from tkinter import messagebox, filedialog
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+import pandas as pd
+from datetime import datetime
+import os
+import re
+
+
+class TimeEntryApp:
+    def __init__(self):
+        """Initialize the Time Entry Application"""
+        # Create main window with ttkbootstrap theme
+        self.root = ttk.Window(themename="cosmo")
+        self.root.title("Time Entry Application")
+        self.root.geometry("800x700")
+        self.root.resizable(True, True)
+        
+        # Initialize variables
+        self.excel_file_path = None
+        self.current_date = datetime.now().strftime("%Y-%m-%d")
+        self.step_entries = []  # List to store step entry widgets for tab navigation
+        
+        # Create GUI elements
+        self.create_widgets()
+        
+        # Center the window
+        self.center_window()
+    
+    def center_window(self):
+        """Center the window on screen"""
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def create_widgets(self):
+        """Create and arrange all GUI widgets"""
+        # Main container with padding
+        main_frame = ttk.Frame(self.root, padding="20")
+        main_frame.pack(fill=BOTH, expand=True)
+        
+        # Title
+        title_label = ttk.Label(
+            main_frame, 
+            text="Time Entry Application", 
+            font=("Arial", 18, "bold"),
+            bootstyle="primary"
+        )
+        title_label.pack(pady=(0, 20))
+        
+        # File status frame
+        self.create_file_status_frame(main_frame)
+        
+        # Date and ID frame
+        self.create_date_id_frame(main_frame)
+        
+        # Steps frame
+        self.create_steps_frame(main_frame)
+        
+        # Buttons frame
+        self.create_buttons_frame(main_frame)
+        
+        # Set up tab navigation after all widgets are created
+        self.setup_tab_navigation()
+    
+    def create_file_status_frame(self, parent):
+        """Create file status display frame"""
+        file_frame = ttk.LabelFrame(parent, text="File Status", padding="10")
+        file_frame.pack(fill=X, pady=(0, 20))
+        
+        self.file_status_label = ttk.Label(
+            file_frame, 
+            text="No file loaded", 
+            font=("Arial", 10),
+            bootstyle="secondary"
+        )
+        self.file_status_label.pack()
+    
+    def create_date_id_frame(self, parent):
+        """Create date and ID input frame"""
+        date_id_frame = ttk.LabelFrame(parent, text="Basic Information", padding="10")
+        date_id_frame.pack(fill=X, pady=(0, 20))
+        
+        # Date section
+        date_frame = ttk.Frame(date_id_frame)
+        date_frame.pack(fill=X, pady=(0, 10))
+        
+        ttk.Label(date_frame, text="Date:", font=("Arial", 10, "bold")).pack(side=LEFT)
+        self.date_var = tk.StringVar(value=self.current_date)
+        self.date_entry = ttk.Entry(
+            date_frame, 
+            textvariable=self.date_var, 
+            font=("Arial", 10),
+            width=15
+        )
+        self.date_entry.pack(side=LEFT, padx=(10, 0))
+        
+        # ID section
+        id_frame = ttk.Frame(date_id_frame)
+        id_frame.pack(fill=X)
+        
+        ttk.Label(id_frame, text="ID Number:", font=("Arial", 10, "bold")).pack(side=LEFT)
+        self.id_var = tk.StringVar()
+        self.id_entry = ttk.Entry(
+            id_frame, 
+            textvariable=self.id_var, 
+            font=("Arial", 10),
+            width=15
+        )
+        self.id_entry.pack(side=LEFT, padx=(10, 0))
+    
+    def create_steps_frame(self, parent):
+        """Create the 7 step input frames"""
+        steps_frame = ttk.LabelFrame(parent, text="Time Steps", padding="10")
+        steps_frame.pack(fill=BOTH, expand=True, pady=(0, 20))
+        
+        # Create scrollable frame for steps
+        canvas = tk.Canvas(steps_frame, height=300)
+        scrollbar = ttk.Scrollbar(steps_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Initialize step variables
+        self.step_vars = []
+        self.step_am_pm_vars = []
+        self.step_converted_labels = []
+        
+        # Create 7 step input sections
+        for i in range(1, 8):
+            self.create_step_section(scrollable_frame, i)
+        
+        # Bind mousewheel to canvas
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind("<MouseWheel>", on_mousewheel)
+    
+    def create_step_section(self, parent, step_num):
+        """Create individual step input section"""
+        step_frame = ttk.LabelFrame(parent, text=f"Step {step_num}", padding="10")
+        step_frame.pack(fill=X, pady=(0, 10))
+        
+        # Main input frame
+        input_frame = ttk.Frame(step_frame)
+        input_frame.pack(fill=X)
+        
+        # Time input
+        ttk.Label(input_frame, text="Time Digits:", font=("Arial", 9)).pack(side=LEFT)
+        
+        step_var = tk.StringVar()
+        step_var.trace('w', lambda *args, step=step_num-1: self.convert_time(step))
+        self.step_vars.append(step_var)
+        
+        step_entry = ttk.Entry(
+            input_frame, 
+            textvariable=step_var, 
+            font=("Arial", 9),
+            width=10
+        )
+        step_entry.pack(side=LEFT, padx=(10, 20))
+        
+        # Store entry widget for tab navigation
+        self.step_entries.append(step_entry)
+        
+        # AM/PM selection
+        am_pm_var = tk.BooleanVar(value=True)  # True = AM, False = PM
+        self.step_am_pm_vars.append(am_pm_var)
+        
+        am_radio = ttk.Radiobutton(
+            input_frame, 
+            text="AM", 
+            variable=am_pm_var, 
+            value=True,
+            command=lambda step=step_num-1: self.convert_time(step)
+        )
+        am_radio.pack(side=LEFT, padx=(0, 5))
+        
+        pm_radio = ttk.Radiobutton(
+            input_frame, 
+            text="PM", 
+            variable=am_pm_var, 
+            value=False,
+            command=lambda step=step_num-1: self.convert_time(step)
+        )
+        pm_radio.pack(side=LEFT, padx=(0, 20))
+        
+        # Converted time display
+        converted_label = ttk.Label(
+            input_frame, 
+            text="--:--", 
+            font=("Arial", 10, "bold"),
+            foreground="blue"
+        )
+        converted_label.pack(side=LEFT)
+        self.step_converted_labels.append(converted_label)
+    
+    def setup_tab_navigation(self):
+        """Set up tab navigation between time entry fields"""
+        def on_tab(event, current_index):
+            # Move to next step entry field, or to submit button after step 7
+            if current_index < 6:  # Steps 1-6, move to next step
+                next_index = current_index + 1
+                self.step_entries[next_index].focus_set()
+            else:  # Step 7, move to submit button
+                self.submit_btn.focus_set()
+            return "break"  # Prevent default tab behavior
+        
+        def on_submit_tab(event):
+            # From submit button, cycle back to step 1
+            self.step_entries[0].focus_set()
+            return "break"
+        
+        # Bind Tab key for each entry field
+        for i, entry in enumerate(self.step_entries):
+            entry.bind("<Tab>", lambda event, idx=i: on_tab(event, idx))
+        
+        # Bind Tab key for submit button
+        self.submit_btn.bind("<Tab>", on_submit_tab)
+        
+        # Bind Enter key to submit button for easy submission
+        self.submit_btn.bind("<Return>", lambda event: self.submit_entry())
+    
+    def convert_time(self, step_index):
+        """Convert digit input to HH:MM format"""
+        try:
+            digits = self.step_vars[step_index].get().strip()
+            
+            if not digits:
+                self.step_converted_labels[step_index].config(text="--:--")
+                return
+            
+            # Validate input (only digits allowed)
+            if not re.match(r'^\d+$', digits):
+                self.step_converted_labels[step_index].config(text="Invalid")
+                return
+            
+            # Convert digits to time format
+            time_str = self.digits_to_time(digits)
+            
+            if time_str:
+                # Handle AM/PM conversion
+                is_am = self.step_am_pm_vars[step_index].get()
+                converted_time = self.format_12_hour_time(time_str, is_am)
+                self.step_converted_labels[step_index].config(text=converted_time)
+            else:
+                self.step_converted_labels[step_index].config(text="Invalid")
+                
+        except Exception as e:
+            self.step_converted_labels[step_index].config(text="Error")
+    
+    def digits_to_time(self, digits):
+        """Convert digit string to HH:MM format"""
+        if len(digits) == 0:
+            return None
+        elif len(digits) == 1:
+            # Single digit: assume 0X:0X format
+            return f"0{digits}:00"
+        elif len(digits) == 2:
+            # Two digits: assume XX:0X or 0X:XX
+            if int(digits) <= 59:
+                return f"00:{digits.zfill(2)}"
+            else:
+                return f"{digits}:00"
+        elif len(digits) == 3:
+            # Three digits: X:XX format
+            hour = digits[0]
+            minute = digits[1:]
+            if int(minute) <= 59:
+                return f"0{hour}:{minute}"
+            else:
+                return None
+        elif len(digits) == 4:
+            # Four digits: XX:XX format
+            hour = digits[:2]
+            minute = digits[2:]
+            if int(hour) <= 23 and int(minute) <= 59:
+                return f"{hour}:{minute}"
+            else:
+                return None
+        else:
+            return None
+    
+    def format_12_hour_time(self, time_24, is_am):
+        """Convert 24-hour format to 12-hour format based on AM/PM selection"""
+        try:
+            hour, minute = map(int, time_24.split(':'))
+            
+            if is_am:
+                # AM: keep as is, but handle 12 AM case
+                if hour == 0:
+                    display_hour = 12
+                elif hour > 12:
+                    display_hour = hour - 12
+                else:
+                    display_hour = hour
+                am_pm = "AM"
+            else:
+                # PM: add 12 to hour (except for 12 PM)
+                if hour == 0:
+                    display_hour = 12
+                elif hour < 12:
+                    display_hour = hour + 12
+                else:
+                    display_hour = hour
+                am_pm = "PM"
+            
+            return f"{display_hour:02d}:{minute:02d} {am_pm}"
+        except:
+            return time_24
+    
+    def create_buttons_frame(self, parent):
+        """Create buttons frame"""
+        buttons_frame = ttk.Frame(parent)
+        buttons_frame.pack(fill=X)
+        
+        # Submit button (moved to first position for easy tab access)
+        self.submit_btn = ttk.Button(
+            buttons_frame,
+            text="Submit Entry",
+            command=self.submit_entry,
+            bootstyle="primary",
+            width=15
+        )
+        self.submit_btn.pack(side=LEFT, padx=(0, 10))
+        
+        # Create button
+        create_btn = ttk.Button(
+            buttons_frame,
+            text="Create Excel File",
+            command=self.create_excel_file,
+            bootstyle="success",
+            width=15
+        )
+        create_btn.pack(side=LEFT, padx=(0, 10))
+        
+        # Load button
+        load_btn = ttk.Button(
+            buttons_frame,
+            text="Load Excel File",
+            command=self.load_excel_file,
+            bootstyle="info",
+            width=15
+        )
+        load_btn.pack(side=LEFT, padx=(0, 10))
+        
+        # Clear button
+        clear_btn = ttk.Button(
+            buttons_frame,
+            text="Clear All",
+            command=self.clear_all_fields,
+            bootstyle="warning",
+            width=15
+        )
+        clear_btn.pack(side=LEFT)
+    
+    def create_excel_file(self):
+        """Create a new Excel file with predefined structure"""
+        try:
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                title="Create New Excel File"
+            )
+            
+            if file_path:
+                # Create DataFrame with headers
+                headers = ['Date', 'ID Number', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7']
+                df = pd.DataFrame(columns=headers)
+                
+                # Save to Excel
+                df.to_excel(file_path, index=False)
+                
+                self.excel_file_path = file_path
+                self.update_file_status()
+                
+                messagebox.showinfo("Success", f"Excel file created successfully!\n{file_path}")
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"Error creating Excel file:\n{str(e)}")
+    
+    def load_excel_file(self):
+        """Load an existing Excel file"""
+        try:
+            file_path = filedialog.askopenfilename(
+                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                title="Load Excel File"
+            )
+            
+            if file_path:
+                # Verify the file can be loaded
+                df = pd.read_excel(file_path)
+                
+                self.excel_file_path = file_path
+                self.update_file_status()
+                
+                messagebox.showinfo("Success", f"Excel file loaded successfully!\n{os.path.basename(file_path)}")
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading Excel file:\n{str(e)}")
+    
+    def update_file_status(self):
+        """Update the file status display"""
+        if self.excel_file_path:
+            filename = os.path.basename(self.excel_file_path)
+            self.file_status_label.config(text=f"File: {filename}")
+        else:
+            self.file_status_label.config(text="No file loaded")
+    
+    def submit_entry(self):
+        """Submit the current entry to Excel file"""
+        try:
+            if not self.excel_file_path:
+                messagebox.showwarning("Warning", "Please create or load an Excel file first!")
+                return
+            
+            # Validate required fields
+            if not self.date_var.get().strip():
+                messagebox.showwarning("Warning", "Please enter a date!")
+                return
+            
+            if not self.id_var.get().strip():
+                messagebox.showwarning("Warning", "Please enter an ID number!")
+                return
+            
+            # Collect data
+            data_row = [self.date_var.get().strip(), self.id_var.get().strip()]
+            
+            # Add converted times for each step
+            for i in range(7):
+                converted_text = self.step_converted_labels[i].cget("text")
+                if converted_text in ["--:--", "Invalid", "Error", ""]:
+                    converted_text = ""
+                data_row.append(converted_text)
+            
+            # Load existing data
+            try:
+                df = pd.read_excel(self.excel_file_path)
+            except:
+                # If file doesn't exist or is empty, create new DataFrame
+                headers = ['Date', 'ID Number', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7']
+                df = pd.DataFrame(columns=headers)
+            
+            # Add new row
+            df.loc[len(df)] = data_row
+            
+            # Save to Excel
+            df.to_excel(self.excel_file_path, index=False)
+            
+            messagebox.showinfo("Success", "Entry submitted successfully!")
+            
+            # Clear step fields but keep date and ID
+            self.clear_step_fields()
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"Error submitting entry:\n{str(e)}")
+    
+    def clear_step_fields(self):
+        """Clear only the step input fields"""
+        for i in range(7):
+            self.step_vars[i].set("")
+            self.step_am_pm_vars[i].set(True)  # Reset to AM
+            self.step_converted_labels[i].config(text="--:--")
+    
+    def clear_all_fields(self):
+        """Clear all input fields"""
+        # Clear date and ID (but keep current date as default)
+        self.date_var.set(datetime.now().strftime("%Y-%m-%d"))
+        self.id_var.set("")
+        
+        # Clear step fields
+        self.clear_step_fields()
+    
+    def run(self):
+        """Start the application"""
+        self.root.mainloop()
+
+
+def main():
+    """Main function to run the application"""
+    try:
+        app = TimeEntryApp()
+        app.run()
+    except Exception as e:
+        print(f"Error starting application: {e}")
+        messagebox.showerror("Error", f"Error starting application:\n{str(e)}")
+
+
+if __name__ == "__main__":
+    main()
