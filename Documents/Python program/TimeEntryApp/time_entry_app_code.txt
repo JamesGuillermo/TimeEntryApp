@@ -37,6 +37,7 @@ class TimeEntryApp:
         self.excel_file_path = None
         self.current_date = datetime.now().strftime("%Y-%m-%d")
         self.step_entries = []  # List to store step entry widgets for tab navigation
+        self.submitting = False  # Flag to prevent duplicate submissions
         
         # Create GUI elements
         self.create_widgets()
@@ -247,7 +248,12 @@ class TimeEntryApp:
         self.submit_btn.bind("<Tab>", on_submit_tab)
         
         # Bind Enter key to submit button for easy submission
-        self.submit_btn.bind("<Return>", lambda event: self.submit_entry())
+        def on_submit_enter(event):
+            if not self.submitting:  # Only submit if not already submitting
+                self.submit_entry()
+            return "break"
+        
+        self.submit_btn.bind("<Return>", on_submit_enter)
     
     def convert_time(self, step_index):
         """Convert digit input to HH:MM format"""
@@ -437,6 +443,16 @@ class TimeEntryApp:
     
     def submit_entry(self):
         """Submit the current entry to Excel file"""
+        # Prevent duplicate submissions
+        if self.submitting:
+            return
+        
+        self.submitting = True
+        
+        # Disable submit button and change text to show processing
+        original_text = self.submit_btn.cget("text")
+        self.submit_btn.config(text="Submitting...", state="disabled")
+        
         try:
             if not self.excel_file_path:
                 messagebox.showwarning("Warning", "Please create or load an Excel file first!")
@@ -479,9 +495,14 @@ class TimeEntryApp:
             
             # Clear step fields but keep date and ID
             self.clear_step_fields()
-        
+            
         except Exception as e:
             messagebox.showerror("Error", f"Error submitting entry:\n{str(e)}")
+        
+        finally:
+            # Always reset the submitting flag and restore button
+            self.submitting = False
+            self.submit_btn.config(text=original_text, state="normal")
     
     def clear_step_fields(self):
         """Clear only the step input fields"""
