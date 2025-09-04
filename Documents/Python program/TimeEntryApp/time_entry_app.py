@@ -115,20 +115,6 @@ class TimeEntryApp:
             width=15
         )
         self.date_entry.pack(side=LEFT, padx=(10, 0))
-        
-        # ID section
-        id_frame = ttk.Frame(date_id_frame)
-        id_frame.pack(fill=X)
-        
-        ttk.Label(id_frame, text="ID Number:", font=("Arial", 10, "bold")).pack(side=LEFT)
-        self.id_var = tk.StringVar()
-        self.id_entry = ttk.Entry(
-            id_frame, 
-            textvariable=self.id_var, 
-            font=("Arial", 10),
-            width=15
-        )
-        self.id_entry.pack(side=LEFT, padx=(10, 0))
     
     def create_steps_frame(self, parent):
         """Create the 7 step input frames"""
@@ -399,7 +385,7 @@ class TimeEntryApp:
             
             if file_path:
                 # Create DataFrame with headers
-                headers = ['Date', 'ID Number', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7']
+                headers = ['Date', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7']
                 df = pd.DataFrame(columns=headers)
                 
                 # Save to Excel
@@ -424,6 +410,20 @@ class TimeEntryApp:
             if file_path:
                 # Verify the file can be loaded
                 df = pd.read_excel(file_path)
+                
+                # Check if this is an old file format with 'ID Number' column
+                if 'ID Number' in df.columns:
+                    # Ask user if they want to convert to new format
+                    result = messagebox.askyesno(
+                        "File Format Update", 
+                        "This file contains an 'ID Number' column which is no longer used.\n\n" +
+                        "Would you like to automatically update the file to the new format?\n" +
+                        "(The ID Number column will be removed)"
+                    )
+                    if result:
+                        df = df.drop(columns=['ID Number'])
+                        df.to_excel(file_path, index=False)
+                        messagebox.showinfo("Updated", "File format updated successfully!")
                 
                 self.excel_file_path = file_path
                 self.update_file_status()
@@ -463,12 +463,8 @@ class TimeEntryApp:
                 messagebox.showwarning("Warning", "Please enter a date!")
                 return
             
-            if not self.id_var.get().strip():
-                messagebox.showwarning("Warning", "Please enter an ID number!")
-                return
-            
             # Collect data
-            data_row = [self.date_var.get().strip(), self.id_var.get().strip()]
+            data_row = [self.date_var.get().strip()]
             
             # Add converted times for each step
             for i in range(7):
@@ -480,20 +476,37 @@ class TimeEntryApp:
             # Load existing data
             try:
                 df = pd.read_excel(self.excel_file_path)
+                
+                # Check if this is an old file format with 'ID Number' column
+                if 'ID Number' in df.columns:
+                    # Convert to new format by removing ID Number column
+                    df = df.drop(columns=['ID Number'])
+                    # Update the file with new format
+                    df.to_excel(self.excel_file_path, index=False)
+                
+                # Ensure we have the correct columns
+                expected_columns = ['Date', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7']
+                if list(df.columns) != expected_columns:
+                    df = df.reindex(columns=expected_columns, fill_value="")
+                    
             except:
                 # If file doesn't exist or is empty, create new DataFrame
-                headers = ['Date', 'ID Number', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7']
+                headers = ['Date', 'Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7']
                 df = pd.DataFrame(columns=headers)
             
+            # Ensure data_row has correct length (pad with empty strings if needed)
+            while len(data_row) < len(df.columns):
+                data_row.append("")
+            
             # Add new row
-            df.loc[len(df)] = data_row
+            df.loc[len(df)] = data_row[:len(df.columns)]
             
             # Save to Excel
             df.to_excel(self.excel_file_path, index=False)
             
             messagebox.showinfo("Success", "Entry submitted successfully!")
             
-            # Clear step fields but keep date and ID
+            # Clear step fields but keep date
             self.clear_step_fields()
             
         except Exception as e:
@@ -513,9 +526,8 @@ class TimeEntryApp:
     
     def clear_all_fields(self):
         """Clear all input fields"""
-        # Clear date and ID (but keep current date as default)
+        # Clear date (but keep current date as default)
         self.date_var.set(datetime.now().strftime("%Y-%m-%d"))
-        self.id_var.set("")
         
         # Clear step fields
         self.clear_step_fields()

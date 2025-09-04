@@ -3,7 +3,7 @@ Time Entry Application - Complete Python Code
 ==============================================
 
 A GUI application for entering digit-based time values, converting them to HH:MM format,
-and saving to Excel files with a predefined structure.
+and saving to Excel files with a predefined structure. Updated to remove ID Number requirement.
 
 Requirements:
 - ttkbootstrap (pip install ttkbootstrap)
@@ -12,6 +12,7 @@ Requirements:
 
 Author: GitHub Copilot
 Date: September 2, 2025
+Updated: September 4, 2025 - Removed ID Number requirement
 """
 
 import tkinter as tk
