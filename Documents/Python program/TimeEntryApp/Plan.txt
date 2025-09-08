@@ -1,3 +1,86 @@
+---My Enhanced Plan---
+
+Role:
+You are an expert Python developer specializing in GUI applications with ttkbootstrap and Excel file handling.
+
+Task:
+Create a Python GUI application that allows the user to enter digit-based time values, automatically converts them into HH:MM format, and saves the data into an Excel file with a predefined structure.
+
+🔹 Requirements
+GUI Design
+
+Date Field
+
+An entry widget where the user can select or type a date.
+
+The chosen date persists until manually changed (does not reset on new submissions).
+
+ID Number Field
+
+Entry widget for entering an ID number.
+
+Step Inputs (1–7)
+
+Each step includes:
+
+An entry widget for digit input (e.g., 634).
+
+A checkbox for AM/PM (default = AM).
+
+After entering a digit, the app should show the converted time (HH:MM) for verification.
+
+Buttons
+
+Submit: Saves the batch (Date, ID, Step 1–7) into the Excel file, appending at the last available row.
+
+Load: Loads an existing Excel file. New entries will append at the end.
+
+Create: Creates a new Excel file with the required structure if none exists.
+
+Excel Design
+
+File format: .xlsx
+
+Columns:
+
+A: Date
+
+B: ID number
+
+C–I: Step 1 → Step 7
+
+Conversion Rules
+
+Input digits must be padded and formatted into HH:MM.
+
+Examples:
+
+62 → 06:02
+
+634 → 06:34
+
+101 → 10:01
+
+1021 → 10:21
+
+AM/PM selection determines the correct 12/24-hour format.
+
+Handle invalid inputs (non-digits) gracefully with error messages.
+
+🔹 Output Expectations
+
+Provide clean, optimized, and well-documented Python code. write it in .txt file (create)
+
+Use ttkbootstrap for GUI styling.
+
+Use pandas or openpyxl for Excel operations.
+
+Include comments explaining key parts of the code.
+
+Ensure the application is modular and easy to extend.
+
+---My first Plan---
+
 Goal: Create a GUI application in ttkbootstrap python that convert the digit submitted by the user in TIME FORMAT and saved it to excel with a specified FORMAT
 Example: User type [62,634,101,1021,121,1216] then convert it into [06:02,06:34,10:01,10:21,12:01,12:16]
 
